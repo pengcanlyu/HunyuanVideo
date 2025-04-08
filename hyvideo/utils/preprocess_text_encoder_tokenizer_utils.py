@@ -1,5 +1,6 @@
 import argparse
 import torch
+import gc
 from transformers import (
     AutoProcessor,
     LlavaForConditionalGeneration,
@@ -7,13 +8,18 @@ from transformers import (
 
 
 def preprocess_text_encoder_tokenizer(args):
+    # 清理CUDA缓存以释放内存
+    torch.cuda.empty_cache()
+    gc.collect()
 
     processor = AutoProcessor.from_pretrained(args.input_dir)
+    # 使用 device_map="auto" 自动分配模型到可用的设备上
     model = LlavaForConditionalGeneration.from_pretrained(
         args.input_dir,
         torch_dtype=torch.float16,
         low_cpu_mem_usage=True,
-    ).to(0)
+        device_map="auto"  # 自动将模型分配到可用的设备上
+    )
 
     model.language_model.save_pretrained(
         f"{args.output_dir}"
@@ -21,6 +27,11 @@ def preprocess_text_encoder_tokenizer(args):
     processor.tokenizer.save_pretrained(
         f"{args.output_dir}"
     )
+    
+    # 清理内存
+    del model
+    torch.cuda.empty_cache()
+    gc.collect()
 
 if __name__ == "__main__":
 
